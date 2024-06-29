@@ -21,41 +21,13 @@ FONT_SIZE = 1
 FONT_THICKNESS = 1
 HANDEDNESS_TEXT_COLOR = (88, 205, 54) # vibrant green
 
-def draw_landmarks_on_image(rgb_image, detection_result):
-  hand_landmarks_list = detection_result.hand_landmarks
-  handedness_list = detection_result.handedness
-  annotated_image = np.copy(rgb_image)
 
-  # Loop through the detected hands to visualize.
-  for idx in range(len(hand_landmarks_list)):
-    hand_landmarks = hand_landmarks_list[idx]
-    handedness = handedness_list[idx]
 
-    # Draw the hand landmarks.
-    hand_landmarks_proto = landmark_pb2.NormalizedLandmarkList()
-    hand_landmarks_proto.landmark.extend([
-      landmark_pb2.NormalizedLandmark(x=landmark.x, y=landmark.y, z=landmark.z) for landmark in hand_landmarks
-    ])
-    solutions.drawing_utils.draw_landmarks(
-      annotated_image,
-      hand_landmarks_proto,
-      solutions.hands.HAND_CONNECTIONS,
-      solutions.drawing_styles.get_default_hand_landmarks_style(),
-      solutions.drawing_styles.get_default_hand_connections_style())
+detector = HandDetector(maxHands=2, 
+                        detectionCon=0.8) 
 
-    # Get the top left corner of the detected hand's bounding box.
-    height, width, _ = annotated_image.shape
-    x_coordinates = [landmark.x for landmark in hand_landmarks]
-    y_coordinates = [landmark.y for landmark in hand_landmarks]
-    text_x = int(min(x_coordinates) * width)
-    text_y = int(min(y_coordinates) * height) - MARGIN
-
-    # Draw handedness (left or right hand) on the image.
-    cv2.putText(annotated_image, f"{handedness[0].category_name}",
-                (text_x, text_y), cv2.FONT_HERSHEY_DUPLEX,
-                FONT_SIZE, HANDEDNESS_TEXT_COLOR, FONT_THICKNESS, cv2.LINE_AA)
-
-  return annotated_image
+fourcc = cv2.VideoWriter_fourcc(*'XVID')
+out = cv2.VideoWriter('~/output.avi', fourcc, 20.0, (1280, 720))
 
 # initialize the video stream,
 # and initialize the FPS counter
@@ -66,48 +38,44 @@ time.sleep(2.0)
 
 # detector = HandDetector(maxHands=1, detectionCon=0.8) 
 
-base_options = python.BaseOptions(model_asset_path='hand_landmarker.task')
-options = vision.HandLandmarkerOptions(base_options=base_options,
-                                       num_hands=2)
-detector = vision.HandLandmarker.create_from_options(options)
+# base_options = python.BaseOptions(model_asset_path='hand_landmarker.task')
+# options = vision.HandLandmarkerOptions(base_options=base_options,
+#                                        num_hands=2)
+# detector = vision.HandLandmarker.create_from_options(options)
 
 mp_hands = mp.solutions.hands
-hands = mp_hands.Hands(static_image_mode=False, max_num_hands=2, min_detection_confidence=0.5)
+hands = mp_hands.Hands(static_image_mode=False, max_num_hands=2, min_detection_confidence=0.8)
 mp_drawing = mp.solutions.drawing_utils
 
+eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_eye.xml')
 
 # FPS: used to compute the (approximate) frames per second
 # Start the FPS timer
 fps = FPS().start()
 
 while True:
-	# grab the frame from the threaded video stream and resize it to have a maximum width of 400 pixels
-	# vs is the VideoStream
+
     frame = vs.read()
     if frame is None:
         break
-    # image_data = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    # image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image_data)
-	# #image = mp.Image(image_format=mp.ImageFormat.GRAY8, data=cv_mat)
 
+    print(frame.shape)
     # detection_result = detector.detect(image) 
+    hands, img = detector.findHands(frame)
 
-    # Convert the frame to RGB as MediaPipe expects RGB images
-    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    if hands:
+        finger_count=0
+        # For each detected hand
+        for hand in hands:
+            finger_count =finger_count + sum(detector.fingersUp(hand))
 
-    # Process the frame and find hands
-    results = hands.process(rgb_frame)
+            # Display the finger count on the frame
+        cv2.putText(img, f'Palce: {finger_count}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
-    # Draw hand landmarks on the frame
-    if results.multi_hand_landmarks:
-        for hand_landmarks in results.multi_hand_landmarks:
-            mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
 
     # Display the resulting frame
     cv2.imshow("Frame", frame)
-
-      
- 
+    out.write(frame)
 
     key = cv2.waitKey(1) & 0xFF
 
