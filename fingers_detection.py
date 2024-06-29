@@ -71,6 +71,11 @@ options = vision.HandLandmarkerOptions(base_options=base_options,
                                        num_hands=2)
 detector = vision.HandLandmarker.create_from_options(options)
 
+mp_hands = mp.solutions.hands
+hands = mp_hands.Hands(static_image_mode=False, max_num_hands=2, min_detection_confidence=0.5)
+mp_drawing = mp.solutions.drawing_utils
+
+
 # FPS: used to compute the (approximate) frames per second
 # Start the FPS timer
 fps = FPS().start()
@@ -78,41 +83,40 @@ fps = FPS().start()
 while True:
 	# grab the frame from the threaded video stream and resize it to have a maximum width of 400 pixels
 	# vs is the VideoStream
-	frame = vs.read()
-	cv_mat = cv2.imread(frame)
-	image = mp.Image(image_format=mp.ImageFormat.SRGB, data=cv_mat)
-	#image = mp.Image(image_format=mp.ImageFormat.GRAY8, data=cv_mat)
+    frame = vs.read()
+    if frame is None:
+        break
+    # image_data = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    # image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image_data)
+	# #image = mp.Image(image_format=mp.ImageFormat.GRAY8, data=cv_mat)
 
-	detection_result = detector.detect(image) 
+    # detection_result = detector.detect(image) 
 
-	annotated_image = draw_landmarks_on_image(image.numpy_view(), detection_result)
-	cv2.imshow("Video", cv2.cvtColor(annotated_image, cv2.COLOR_RGB2BGR))
+    # Convert the frame to RGB as MediaPipe expects RGB images
+    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-	# if hand:
-    #       # Taking the landmarks of hand 
-	# 	lmlist = hand[0]  
-	# 	print(lmlist)
-	# 	# if lmlist: 
-            
-    #           # Find how many fingers are up 
-    #         # This function return list 
-	# 		# fingerup = detector.fingersUp(lmlist)   
-	# 		# print(fingerup)
+    # Process the frame and find hands
+    results = hands.process(rgb_frame)
 
-    # # # Resize the image 
-	# # fing = cv2.resize(fing, (220, 280)) 
-	# # frame[50:330, 20:240] = fing 
+    # Draw hand landmarks on the frame
+    if results.multi_hand_landmarks:
+        for hand_landmarks in results.multi_hand_landmarks:
+            mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+
+    # Display the resulting frame
+    cv2.imshow("Frame", frame)
+
       
  
 
-	key = cv2.waitKey(1) & 0xFF
+    key = cv2.waitKey(1) & 0xFF
 
 	# Press 'q' key to break the loop
-	if key == ord("q"):
-		break
+    if key == ord("q"):
+        break
 
-	# update the FPS counter
-	fps.update()
+    # update the FPS counter
+    fps.update()
 
 # stop the timer
 fps.stop()
