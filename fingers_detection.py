@@ -10,9 +10,6 @@ from cvzone.HandTrackingModule import HandDetector
 
 import imageio
 
-
-
-
 detector = HandDetector(maxHands=2, detectionCon=0.8) 
 # initialize the video stream
 # and initialize the FPS counter
